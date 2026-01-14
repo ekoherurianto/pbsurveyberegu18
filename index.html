@@ -26,17 +26,36 @@
         .partai-row { background: var(--gray); padding: 10px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #ddd; }
         .partai-title { font-size: 11px; font-weight: bold; color: var(--primary); margin-bottom: 5px; text-transform: uppercase; }
         
-        /* Loading Style */
-        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        /* IMPROVED LOADING STYLE */
+        .loading-overlay { 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(255, 255, 255, 0.9); 
+            display: none; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 9999; 
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s ease;
+        }
+        .spinner { 
+            width: 50px; 
+            height: 50px; 
+            border: 5px solid #e2e8f0; 
+            border-top: 5px solid var(--accent); 
+            border-radius: 50%; 
+            animation: spin 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite; 
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { margin-top: 15px; font-family: sans-serif; font-weight: 600; color: var(--primary); letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
 
 <div id="globalLoader" class="loading-overlay">
     <div class="spinner"></div>
-    <div style="margin-top:10px; font-weight:bold;">Menyimpan ke Cloud...</div>
+    <div class="loading-text">Sinkronisasi Cloud...</div>
 </div>
 
 <div id="editOverlay">
@@ -45,8 +64,7 @@
         <label>Waktu Pertandingan:</label>
         <input type="datetime-local" id="editTime">
 
-        <div id="partaiInputs">
-            </div>
+        <div id="partaiInputs"></div>
 
         <div style="display:flex; gap:10px; margin-top:15px;">
             <button class="btn" style="background:#ddd" onclick="closeEdit()">Batal</button>
@@ -88,47 +106,47 @@
     let db = { teams: [], matches: [] };
     let currentEditIdx = null;
 
-    async function sync(action, target, data = null) {
-    const loader = document.getElementById('globalLoader');
-    
-    // 1. Tampilkan loader
-    if (action === 'saveAll') {
+    function showLoader(text) {
+        const loader = document.getElementById('globalLoader');
+        if(text) loader.querySelector('.loading-text').innerText = text;
         loader.style.display = 'flex';
     }
 
-    try {
-        if (action === 'load') {
-            const r = await fetch(`${API}?target=${target}`);
-            return await r.json();
-        } else {
-            // 2. Kirim data
-            await fetch(API, { 
-                method: 'POST', 
-                // Hilangkan mode: 'no-cors' jika Google Apps Script sudah di-deploy dengan benar
-                body: JSON.stringify({ action: 'saveAll', target, data }) 
-            });
-
-            // Beri jeda sedikit agar user sadar ada proses simpan
-            await new Promise(r => setTimeout(r, 1500)); 
-            
-            // Reload data terbaru
-            await loadAll();
-        }
-    } catch (error) {
-        console.error("Gagal sinkronisasi:", error);
-    } finally {
-        // 3. Sembunyikan loader (Taruh di 'finally' agar tetap hilang meski error)
-        if (action === 'saveAll') {
-            loader.style.display = 'none';
-        }
+    function hideLoader() {
+        document.getElementById('globalLoader').style.display = 'none';
     }
+
+    async function sync(action, target, data = null) {
+        showLoader(action === 'load' ? 'Memuat Data...' : 'Menyimpan ke Cloud...');
+        
+        try {
+            if (action === 'load') {
+                const r = await fetch(`${API}?target=${target}`);
+                const res = await r.json();
+                hideLoader();
+                return res;
+            } else {
+                await fetch(API, { 
+                    method: 'POST', 
+                    body: JSON.stringify({ action: 'saveAll', target, data }) 
+                });
+                // Delay visual agar user tahu proses selesai
+                await new Promise(r => setTimeout(r, 1000));
+                await loadAll();
+            }
+        } catch (error) {
+            console.error("Gagal sinkronisasi:", error);
+            alert("Terjadi kesalahan koneksi!");
+        } finally {
+            hideLoader();
+        }
     }
 
     async function loadAll() {
         const t = await sync('load', 'Teams');
-        db.teams = t.slice(1).map(r => ({ name: r[0], players: JSON.parse(r[1] || "[]") }));
+        if(t) db.teams = t.slice(1).map(r => ({ name: r[0], players: JSON.parse(r[1] || "[]") }));
         const m = await sync('load', 'Matches');
-        db.matches = m.slice(1).map(r => ({ a: r[0], b: r[1], time: r[2], sa: r[3], sb: r[4] }));
+        if(m) db.matches = m.slice(1).map(r => ({ a: r[0], b: r[1], time: r[2], sa: r[3], sb: r[4] }));
         render();
     }
 
@@ -137,12 +155,16 @@
         
         // Klasemen
         let st = {}; db.teams.forEach(t => st[t.name] = {m:0, w:0, p:0});
-        db.matches.forEach(m => { if(m.sa !== "") { st[m.a].m++; st[m.b].m++; st[m.a].p += parseInt(m.sa); st[m.b].p += parseInt(m.sb); if(parseInt(m.sa) > parseInt(m.sb)) st[m.a].w++; else st[m.b].w++; } });
+        db.matches.forEach(m => { if(m.sa !== "" && m.sa !== undefined) { 
+            st[m.a].m++; st[m.b].m++; 
+            st[m.a].p += parseInt(m.sa); st[m.b].p += parseInt(m.sb); 
+            if(parseInt(m.sa) > parseInt(m.sb)) st[m.a].w++; else if(parseInt(m.sb) > parseInt(m.sa)) st[m.b].w++; 
+        } });
         const sorted = Object.keys(st).sort((a,b) => st[b].w - st[a].w || st[b].p - st[a].p);
         document.getElementById('v-klasemen').innerHTML = sorted.map(k => `<tr><td style="padding:12px; border-bottom:1px solid #eee"><b>${k}</b></td><td align="center">${st[k].m}</td><td align="center">${st[k].w}</td><td align="center"><b>${st[k].p}</b></td></tr>`).join('');
 
         // Jadwal
-        document.getElementById('v-jadwal').innerHTML = db.matches.map(m => `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center;"><div style="flex:1"><b>${m.a}</b></div><div style="background:#f1f5f9; padding:5px 15px; border-radius:8px; font-weight:bold;">${m.sa !== "" ? m.sa + ' - ' + m.sb : 'VS'}</div><div style="flex:1; text-align:right"><b>${m.b}</b></div></div><div style="text-align:center; font-size:13px; color:#64748b; margin-top:8px;">📅 ${m.time ? new Date(m.time).toLocaleString('id-ID',{weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : 'Waktu Belum Diatur'}</div></div>`).join('');
+        document.getElementById('v-jadwal').innerHTML = db.matches.map(m => `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center;"><div style="flex:1"><b>${m.a}</b></div><div style="background:#f1f5f9; padding:5px 15px; border-radius:8px; font-weight:bold;">${(m.sa !== "" && m.sa !== null) ? m.sa + ' - ' + m.sb : 'VS'}</div><div style="flex:1; text-align:right"><b>${m.b}</b></div></div><div style="text-align:center; font-size:13px; color:#64748b; margin-top:8px;">📅 ${m.time ? new Date(m.time).toLocaleString('id-ID',{weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : 'Waktu Belum Diatur'}</div></div>`).join('');
 
         // Regu
         document.getElementById('v-regu').innerHTML = db.teams.map((t, i) => `<div class="card"><b>${t.name}</b><br>${t.players.map(p => `<span style="display:inline-block; background:#f1f5f9; padding:4px 10px; border-radius:15px; margin:2px; font-size:12px;">${p}</span>`).join('')}${isAdmin ? `<input type="text" id="inp-p-${i}" placeholder="Pemain baru..."><button class="btn btn-accent" onclick="addPlayer(${i})">Tambah</button>` : ''}</div>`).join('');
@@ -170,7 +192,7 @@
                         <select class="sel-pA"><option value="">Pilih Pemain</option>${pA.map(x=>`<option>${x}</option>`).join('')}</select>
                         ${idx > 0 ? `<select class="sel-pA"><option value="">Pilih Pasangan</option>${pA.map(x=>`<option>${x}</option>`).join('')}</select>` : ''}
                     </div>
-                    <div style="width:40px; text-align:center; font-weight:bold;">VS</div>
+                    <div style="width:20px; text-align:center; font-weight:bold;">-</div>
                     <div style="flex:1">
                         <select class="sel-pB"><option value="">Pilih Pemain</option>${pB.map(x=>`<option>${x}</option>`).join('')}</select>
                         ${idx > 0 ? `<select class="sel-pB"><option value="">Pilih Pasangan</option>${pB.map(x=>`<option>${x}</option>`).join('')}</select>` : ''}
@@ -195,8 +217,10 @@
         let winA = 0, winB = 0;
         
         scA.forEach((s, idx) => {
-            if(parseInt(s.value) > parseInt(scB[idx].value)) winA++; 
-            else if(parseInt(scB[idx].value) > parseInt(s.value)) winB++;
+            const vA = parseInt(s.value || 0);
+            const vB = parseInt(scB[idx].value || 0);
+            if(vA > vB) winA++; 
+            else if(vB > vA) winB++;
         });
 
         db.matches[i].time = document.getElementById('editTime').value;
@@ -208,16 +232,15 @@
         await sync('saveAll', 'Matches', data);
     }
 
-    // Boilerplate functions
     function checkPass() { document.getElementById('admin-tools').style.display = document.getElementById('pass').value === PW ? 'block' : 'none'; render(); }
-    async function addTeam() { const n = document.getElementById('t-name').value; if(n) { db.teams.push({name:n, players:[]}); saveTeams(); } }
-    async function addPlayer(i) { const n = document.getElementById(`inp-p-${i}`).value; if(n) { db.teams[i].players.push(n); saveTeams(); } }
+    async function addTeam() { const n = document.getElementById('t-name').value; if(n) { db.teams.push({name:n, players:[]}); document.getElementById('t-name').value = ""; await saveTeams(); } }
+    async function addPlayer(i) { const n = document.getElementById(`inp-p-${i}`).value; if(n) { db.teams[i].players.push(n); await saveTeams(); } }
     async function saveTeams() { const d = [["Nama", "Pemain"], ...db.teams.map(t => [t.name, JSON.stringify(t.players)])]; await sync('saveAll', 'Teams', d); }
-    async function genJadwal() { if(!confirm("Reset jadwal?")) return; let m = [["A","B","T","SA","SB"]]; for(let i=0; i<db.teams.length; i++) for(let j=i+1; j<db.teams.length; j++) m.push([db.teams[i].name, db.teams[j].name, "", "", ""]); await sync('saveAll', 'Matches', m); }
+    async function genJadwal() { if(!confirm("Reset jadwal? Semua skor akan hilang!")) return; let m = [["A","B","T","SA","SB"]]; for(let i=0; i<db.teams.length; i++) for(let j=i+1; j<db.teams.length; j++) m.push([db.teams[i].name, db.teams[j].name, "", "", ""]); await sync('saveAll', 'Matches', m); }
     function tab(id) { document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); document.querySelectorAll('nav button').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); document.getElementById('b-' + id).classList.add('active'); }
+    
+    // Start App
     loadAll();
 </script>
 </body>
-
 </html>
-
