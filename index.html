@@ -89,16 +89,39 @@
     let currentEditIdx = null;
 
     async function sync(action, target, data = null) {
-        if (action === 'saveAll') document.getElementById('globalLoader').style.display = 'flex';
-        if(action === 'load') {
+    const loader = document.getElementById('globalLoader');
+    
+    // 1. Tampilkan loader
+    if (action === 'saveAll') {
+        loader.style.display = 'flex';
+    }
+
+    try {
+        if (action === 'load') {
             const r = await fetch(`${API}?target=${target}`);
             return await r.json();
         } else {
-            await fetch(API, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'saveAll', target, data }) });
-            await new Promise(r => setTimeout(r, 1500));
+            // 2. Kirim data
+            await fetch(API, { 
+                method: 'POST', 
+                // Hilangkan mode: 'no-cors' jika Google Apps Script sudah di-deploy dengan benar
+                body: JSON.stringify({ action: 'saveAll', target, data }) 
+            });
+
+            // Beri jeda sedikit agar user sadar ada proses simpan
+            await new Promise(r => setTimeout(r, 1500)); 
+            
+            // Reload data terbaru
             await loadAll();
-            document.getElementById('globalLoader').style.display = 'none';
         }
+    } catch (error) {
+        console.error("Gagal sinkronisasi:", error);
+    } finally {
+        // 3. Sembunyikan loader (Taruh di 'finally' agar tetap hilang meski error)
+        if (action === 'saveAll') {
+            loader.style.display = 'none';
+        }
+    }
     }
 
     async function loadAll() {
@@ -197,3 +220,4 @@
 </body>
 
 </html>
+
