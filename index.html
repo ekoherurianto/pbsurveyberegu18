@@ -93,7 +93,9 @@
             <h1>PB SURVEY</h1>
             <div style="font-size: 11px; letter-spacing: 4px; opacity: 0.6; margin-bottom: 15px;">TOURNAMENT JILID-18</div>
             <p>"Bukan tentang siapa yang paling kuat, tapi tentang siapa yang pantang menyerah. Junjung sportivitas, jalin persaudaraan!" <br> -- E-JP --<br></p>
-            <button onclick="tab('tab-jadwal')" class="btn btn-primary" style="width: auto; padding: 10px 25px; margin-top: 15px; background: var(--accent);">Lihat Jadwal Match</button>
+            <div style="margin: 20px 0;">
+            <img src="https://i.ibb.co.com/qFWt70Gd/pbsurvey18.jpg" alt="Poster Tournament" style="width: 100%; max-width: 300px; border-radius: 15px; border: 2px solid rgba(255,255,255,0.2);">
+			<button onclick="tab('tab-jadwal')" class="btn btn-primary" style="width: auto; padding: 10px 25px; margin-top: 15px; background: var(--accent);">Lihat Jadwal Match</button>
         </div>
         <div style="padding: 30px; text-align: center; color: var(--text-muted); font-size: 11px;">
             Update Otomatis • Terakhir Sinkron: <span id="last-update">-</span>
@@ -369,3 +371,4 @@ document.getElementById('v-klasemen').innerHTML = sorted.map((k, idx) => `
 </script>
 </body>
 </html>
+
