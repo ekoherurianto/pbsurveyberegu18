@@ -72,13 +72,14 @@
 </head>
 <body>
 
-<div id="globalLoader" class="loading-overlay"><div class="spinner"></div></div>
+<div id="globalLoader" class="loading-overlay">Lagi loading broo<div class="spinner"></div></div>
 
 <div id="editOverlay">
     <div class="card" style="max-width: 500px; margin: auto;">
         <h3 id="editTitle" style="text-align:center; margin:0 0 15px 0;">Input Hasil</h3>
         <label style="font-size:10px; font-weight:bold;">JADWAL MATCH:</label>
         <input type="datetime-local" id="editTime">
+		
         <div id="partaiInputs"></div>
         <div style="display:flex; gap:10px; margin-top:15px;">
             <button class="btn" style="background:#eee" onclick="closeEdit()">Batal</button>
@@ -95,7 +96,7 @@
             <p>"Bukan tentang siapa yang paling kuat, tapi tentang siapa yang pantang menyerah. Junjung sportivitas, jalin persaudaraan!" <br> -- E-JP --<br></p>
             <div style="margin: 20px 0;">
             <img src="https://i.ibb.co.com/qFWt70Gd/pbsurvey18.jpg" alt="Poster Tournament" style="width: 100%; max-width: 300px; border-radius: 15px; border: 2px solid rgba(255,255,255,0.2);">
-			</div>
+        </div>
 			<button onclick="tab('tab-jadwal')" class="btn btn-primary" style="width: auto; padding: 10px 25px; margin-top: 15px; background: var(--accent);">Lihat Jadwal Match</button>
         </div>
         <div style="padding: 30px; text-align: center; color: var(--text-muted); font-size: 11px;">
@@ -269,40 +270,60 @@ document.getElementById('v-klasemen').innerHTML = sorted.map((k, idx) => `
         const teamB = db.teams.find(t => t.name === m.b) || {players:[]};
         
         document.getElementById('editTitle').innerText = `${m.a} vs ${m.b}`;
-        document.getElementById('editTime').value = m.time || "";
+				
+		if (m.time) {
+		const localDate = new Date(m.time);
+			// Format ke YYYY-MM-DDTHH:mm agar terbaca oleh input datetime-local
+		const formattedDate = localDate.getFullYear() + '-' + 
+				String(localDate.getMonth() + 1).padStart(2, '0') + '-' + 
+				String(localDate.getDate()).padStart(2, '0') + 'T' + 
+				String(localDate.getHours()).padStart(2, '0') + ':' + 
+				String(localDate.getMinutes()).padStart(2, '0');
+			document.getElementById('editTime').value = formattedDate;
+		} else {
+			document.getElementById('editTime').value = "";
+		}
 
         let html = "";
         ["Partai 1 (S)", "Partai 2 (D)", "Partai 3 (D)"].forEach((pLabel, idx) => {
             const d = (m.detail && m.detail[idx]) ? m.detail[idx] : {};
-            const optA = teamA.players.map(p => `<option value="${p}" ${d.p1A === p || d.p2A === p ? 'selected' : ''}>${p}</option>`).join('');
-            const optB = teamB.players.map(p => `<option value="${p}" ${d.p1B === p || d.p2B === p ? 'selected' : ''}>${p}</option>`).join('');
+            
+            // FIX PEMAIN: Fungsi ini akan mengecek apakah p.p1A sama dengan nama pemain
+            const optA = teamA.players.map(p => `<option value="${p}" ${d.p1A === p ? 'selected' : ''}>${p}</option>`).join('');
+            const optA2 = teamA.players.map(p => `<option value="${p}" ${d.p2A === p ? 'selected' : ''}>${p}</option>`).join('');
+            
+            const optB = teamB.players.map(p => `<option value="${p}" ${d.p1B === p ? 'selected' : ''}>${p}</option>`).join('');
+            const optB2 = teamB.players.map(p => `<option value="${p}" ${d.p2B === p ? 'selected' : ''}>${p}</option>`).join('');
 
             html += `<div class="partai-box">
                 <div style="font-size:10px; font-weight:bold; margin-bottom:8px; color:var(--primary)">${pLabel}</div>
                 <div style="display:grid; grid-template-columns: 1fr 30px 1fr; gap:8px;">
                     <div>
                         <select class="p-p1A"><option value="">Pemain 1</option>${optA}</select>
-                        ${idx > 0 ? `<select class="p-p2A" style="margin-top:5px;"><option value="">Pemain 2</option>${optA}</select>` : ''}
-                        <input type="number" class="p-scA" placeholder="Skor" value="${d.scA || ''}" style="margin-top:5px; font-weight:bold; text-align:center;">
+                        ${idx > 0 ? `<select class="p-p2A" style="margin-top:5px;"><option value="">Pemain 2</option>${optA2}</select>` : ''}
+                        <input type="number" class="p-scA" placeholder="Skor" value="${d.scA !== undefined ? d.scA : ''}" style="margin-top:5px; font-weight:bold; text-align:center;">
                     </div>
                     <div style="text-align:center; padding-top:15px; font-weight:bold; opacity:0.2">VS</div>
                     <div>
                         <select class="p-p1B"><option value="">Pemain 1</option>${optB}</select>
-                        ${idx > 0 ? `<select class="p-p2B" style="margin-top:5px;"><option value="">Pemain 2</option>${optB}</select>` : ''}
-                        <input type="number" class="p-scB" placeholder="Skor" value="${d.scB || ''}" style="margin-top:5px; font-weight:bold; text-align:center;">
+                        ${idx > 0 ? `<select class="p-p2B" style="margin-top:5px;"><option value="">Pemain 2</option>${optB2}</select>` : ''}
+                        <input type="number" class="p-scB" placeholder="Skor" value="${d.scB !== undefined ? d.scB : ''}" style="margin-top:5px; font-weight:bold; text-align:center;">
                     </div>
                 </div>
             </div>`;
         });
-		let lapHtml = `
-		<label style="font-size:10px; font-weight:bold;">LAPANGAN:</label>
-		<select id="editLap">
-			<option value="">Pilih Lapangan</option>
-			<option value="LAP 1" ${m.lap === 'LAP 1' ? 'selected' : ''}>LAPANGAN 1</option>
-			<option value="LAP 2" ${m.lap === 'LAP 2' ? 'selected' : ''}>LAPANGAN 2</option>
-			<option value="LAP 3" ${m.lap === 'LAP 3' ? 'selected' : ''}>LAPANGAN 3</option>
-		</select>`;
-        document.getElementById('partaiInputs').innerHTML = html;
+
+        let lapHtml = `
+        <label style="font-size:10px; font-weight:bold;">LAPANGAN:</label>
+        <select id="editLap">
+            <option value="">Pilih Lapangan</option>
+            <option value="LAP 1" ${m.lap === 'LAP 1' ? 'selected' : ''}>LAPANGAN 1</option>
+            <option value="LAP 2" ${m.lap === 'LAP 2' ? 'selected' : ''}>LAPANGAN 2</option>
+            <option value="LAP 3" ${m.lap === 'LAP 3' ? 'selected' : ''}>LAPANGAN 3</option>
+        </select>`;
+
+        // PENTING: Gabungkan html skor DAN html lapangan
+        document.getElementById('partaiInputs').innerHTML = html + lapHtml;
         document.getElementById('editOverlay').style.display = 'block';
     }
 
@@ -325,7 +346,8 @@ document.getElementById('v-klasemen').innerHTML = sorted.map((k, idx) => `
             if(scA > scB) winA++; else if(scB > scA) winB++;
         });
 
-        db.matches[i].time = document.getElementById('editTime').value;
+        const timeInput = document.getElementById('editTime').value;
+		db.matches[i].time = timeInput;
         db.matches[i].sa = winA;
         db.matches[i].sb = winB;
         db.matches[i].detail = detail;
@@ -372,5 +394,3 @@ document.getElementById('v-klasemen').innerHTML = sorted.map((k, idx) => `
 </script>
 </body>
 </html>
-
-
